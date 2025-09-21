@@ -1,9 +1,10 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:appweb1/firebase_options.dart';
-import 'package:appweb1/add.dart'; // استيراد صفحة المعلمين الرئيسية
-import 'package:appweb1/student_view.dart'; // استيراد صفحة الطلاب الجديدة
+import 'package:appweb1/add.dart';
+import 'package:appweb1/student_view.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -12,7 +13,6 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  // لتهيئة تنسيقات التاريخ والوقت للغة العربية
   await initializeDateFormatting('ar', null);
   runApp(const TeacherLoginApp());
 }
@@ -24,7 +24,7 @@ class TeacherLoginApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'بوابة الواجبات المدرسية',
-      // دعم اللغة العربية
+      debugShowCheckedModeBanner: false,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -35,30 +35,85 @@ class TeacherLoginApp extends StatelessWidget {
       ],
       locale: const Locale('ar', ''),
       theme: ThemeData(
+        fontFamily: 'Cairo',
         primarySwatch: Colors.blue,
-        fontFamily: 'Tajawal',
-        textTheme: const TextTheme(
-          bodyMedium: TextStyle(fontSize: 16),
-          titleLarge: TextStyle(fontWeight: FontWeight.bold),
+        scaffoldBackgroundColor: Colors.grey[50],
+        cardTheme: CardThemeData(
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            textStyle: const TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.grey),
+          ),
+          filled: true,
+          fillColor: Colors.white,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.blue,
+          foregroundColor: Colors.white,
+          elevation: 2,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            fontFamily: 'Cairo',
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            return const LoadingSplashScreen();
           }
-          if (snapshot.hasData && snapshot.data != null) {
-            // إذا كان المستخدم مسجلاً، اذهب إلى لوحة تحكم المعلم
+          if (snapshot.hasData && snapshot.data != null && !snapshot.data!.isAnonymous) {
             return const AddPage();
           }
-          // إذا لم يكن مسجلاً، اذهب لصفحة تسجيل الدخول
           return const TeacherLoginPage();
         },
       ),
     );
   }
 }
+
+// --- تعديل: شاشة تحميل أبسط وأكثر تركيزًا ---
+class LoadingSplashScreen extends StatelessWidget {
+  const LoadingSplashScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // يمكنك وضع الشعار هنا إذا أردت
+            // Image.asset('assets/e2.png', height: 120),
+            // const SizedBox(height: 32),
+            CircularProgressIndicator(),
+            SizedBox(height: 20),
+            Text('جاري التحميل...'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 
 class TeacherLoginPage extends StatefulWidget {
   const TeacherLoginPage({super.key});
@@ -73,6 +128,7 @@ class _TeacherLoginPageState extends State<TeacherLoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _auth = FirebaseAuth.instance;
   bool _isLoading = false;
+  bool _isStudentLoading = false;
 
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
@@ -83,20 +139,47 @@ class _TeacherLoginPageState extends State<TeacherLoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      // لا تحتاج Navigator.push هنا لأن StreamBuilder سيتولى الأمر
+      // The StreamBuilder will handle navigation on success
     } on FirebaseAuthException catch (e) {
       String message = 'حدث خطأ ما.';
-      if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
+      // This single check handles most login errors (wrong email, wrong password, user not found)
+      if (e.code == 'invalid-credential') {
         message = 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
       } else if (e.code == 'invalid-email') {
-        message = 'البريد الإلكتروني غير صالح.';
+        message = 'صيغة البريد الإلكتروني غير صالحة.';
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _signInAsStudent() async {
+    setState(() => _isStudentLoading = true);
+    try {
+      if (_auth.currentUser == null) {
+        await _auth.signInAnonymously();
+      }
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const StudentViewPage()),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('فشل الدخول كطالب: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isStudentLoading = false);
       }
     }
   }
@@ -108,10 +191,8 @@ class _TeacherLoginPageState extends State<TeacherLoginPage> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
+            constraints: const BoxConstraints(maxWidth: 450),
             child: Card(
-              elevation: 8,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.0)),
               child: Padding(
                 padding: const EdgeInsets.all(32.0),
                 child: Form(
@@ -119,63 +200,58 @@ class _TeacherLoginPageState extends State<TeacherLoginPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      const Text(
-                        'بوابة الواجبات',
-                        style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.blue),
-                      ),
+                      Image.asset('assets/e2.png', height: 100),
                       const SizedBox(height: 24),
+                      const Text(
+                        'بوابة الواجبات للمعلمين',
+                        style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.blue),
+                      ),
+                      const SizedBox(height: 32),
                       TextFormField(
                         controller: _emailController,
-                        decoration: InputDecoration(
-                          labelText: 'البريد الإلكتروني للمعلم',
-                          prefixIcon: const Icon(Icons.email_outlined),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        decoration: const InputDecoration(
+                          labelText: 'البريد الإلكتروني',
+                          prefixIcon: Icon(Icons.email_outlined),
                         ),
                         validator: (value) => value!.isEmpty ? 'الرجاء إدخال البريد الإلكتروني' : null,
+                        keyboardType: TextInputType.emailAddress,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _passwordController,
                         obscureText: true,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           labelText: 'كلمة المرور',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          prefixIcon: Icon(Icons.lock_outline),
                         ),
                         validator: (value) => value!.isEmpty ? 'الرجاء إدخال كلمة المرور' : null,
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 32),
                       SizedBox(
                         width: double.infinity,
-                        height: 50,
                         child: _isLoading
                             ? const Center(child: CircularProgressIndicator())
                             : ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
                           onPressed: _signIn,
-                          child: const Text('تسجيل دخول المعلم', style: TextStyle(fontSize: 18)),
+                          child: const Text('تسجيل دخول'),
                         ),
                       ),
                       const SizedBox(height: 24),
-                      const Divider(),
+                      const Divider(thickness: 1),
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
-                        height: 50,
-                        child: OutlinedButton.icon(
+                        child: _isStudentLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : OutlinedButton.icon(
                           icon: const Icon(Icons.family_restroom),
-                          label: const Text('عرض الواجبات للطلاب'),
+                          label: const Text('عرض الواجبات (للطالب/ولي الأمر)'),
                           style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.blue,
                             side: const BorderSide(color: Colors.blue),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(builder: (context) => const StudentViewPage()),
-                            );
-                          },
+                          onPressed: _signInAsStudent,
                         ),
                       ),
                     ],

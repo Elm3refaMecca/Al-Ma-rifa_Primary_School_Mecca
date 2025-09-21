@@ -19,43 +19,58 @@ class TeacherProfileViewPage extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return const Center(child: Text('حدث خطأ في جلب البيانات.'));
+            debugPrint("Error fetching teacher data: ${snapshot.error}");
+            return const Center(child: Text('حدث خطأ أثناء جلب بيانات المعلم.'));
           }
           if (!snapshot.hasData || !snapshot.data!.exists) {
             return const Center(child: Text('لم يتم العثور على بيانات المعلم.'));
           }
 
-          final userData = snapshot.data!.data() as Map<String, dynamic>;
+          final data = snapshot.data!.data();
+          if (data == null || data is! Map<String, dynamic>) {
+            return const Center(child: Text('صيغة بيانات المعلم غير صحيحة.'));
+          }
+          final userData = data;
+
+          final String name = userData['name'] ?? 'اسم غير متوفر';
+          final String? photoUrl = userData['photo']; // جلب رابط الصورة
+          final String profession1 = userData['profession1'] ?? 'غير متوفر';
+          final String? profession2 = userData['profession2'];
+          final String? profession3 = userData['profession3'];
+          // --- تعديل: استخدام حقل 'phone' ---
+          final String phoneNumber = userData['phone'] ?? 'غير متوفر';
+
 
           return ListView(
             padding: const EdgeInsets.all(16.0),
             children: [
               Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: Padding(
                   padding: const EdgeInsets.all(24.0),
                   child: Column(
                     children: [
-                      const CircleAvatar(
+                      CircleAvatar(
                         radius: 50,
-                        backgroundColor: Colors.blue,
-                        child: Icon(Icons.person, size: 60, color: Colors.white),
+                        backgroundColor: Colors.blue.shade100,
+                        backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                        child: photoUrl == null
+                            ? Icon(Icons.person, size: 60, color: Colors.blue.shade800)
+                            : null,
                       ),
                       const SizedBox(height: 20),
-                      _buildInfoRow(Icons.person_outline, 'الاسم', userData['name'] ?? 'غير متوفر'),
-                      const Divider(),
-                      _buildInfoRow(Icons.work_outline, 'الوظيفة 1', userData['profession1'] ?? 'غير متوفر'),
-                      if (userData['profession2'] != null && (userData['profession2'] as String).isNotEmpty) ...[
+                      Text(name, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 24),
+                      _buildInfoRow(Icons.work_outline, 'المادة الأساسية', profession1),
+                      if (profession2 != null && profession2.isNotEmpty) ...[
                         const Divider(),
-                        _buildInfoRow(Icons.work_outline, 'الوظيفة 2', userData['profession2']),
+                        _buildInfoRow(Icons.work_outline, 'المادة الثانية', profession2),
                       ],
-                      if (userData['profession3'] != null && (userData['profession3'] as String).isNotEmpty) ...[
+                      if (profession3 != null && profession3.isNotEmpty) ...[
                         const Divider(),
-                        _buildInfoRow(Icons.work_outline, 'الوظيفة 3', userData['profession3']),
+                        _buildInfoRow(Icons.work_outline, 'المادة الثالثة', profession3),
                       ],
                       const Divider(),
-                      _buildInfoRow(Icons.phone_outlined, 'رقم الهاتف للتواصل', userData['number'] ?? 'غير معروف'),
+                      _buildInfoRow(Icons.phone_outlined, 'للتواصل', phoneNumber),
                     ],
                   ),
                 ),
@@ -76,7 +91,7 @@ class TeacherProfileViewPage extends StatelessWidget {
           const SizedBox(width: 16),
           Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(width: 8),
-          Expanded(child: Text(value, style: TextStyle(color: Colors.grey.shade700))),
+          Expanded(child: Text(value, style: TextStyle(color: Colors.grey.shade800, fontSize: 16))),
         ],
       ),
     );

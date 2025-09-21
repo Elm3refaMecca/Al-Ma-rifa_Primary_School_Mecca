@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -13,6 +16,7 @@ class _ProfilePageState extends State<ProfilePage> {
   final User? _user = FirebaseAuth.instance.currentUser;
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
+  bool _isUploading = false;
 
   @override
   void initState() {
@@ -31,19 +35,44 @@ class _ProfilePageState extends State<ProfilePage> {
           });
         }
       } catch (e) {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('فشل في جلب البيانات: $e'), backgroundColor: Colors.red),
-          );
-        }
+        if (mounted) setState(() { _isLoading = false; });
       }
     } else {
-      setState(() {
-        _isLoading = false;
-      });
+      if(mounted) setState(() { _isLoading = false; });
+    }
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
+
+    if (pickedFile == null) return;
+
+    setState(() => _isUploading = true);
+
+    try {
+      final file = File(pickedFile.path);
+      // --- تعديل: تغيير مسار الرفع إلى photosT ---
+      final ref = FirebaseStorage.instance.ref('photosT/${_user!.uid}.jpg');
+      await ref.putFile(file);
+      final url = await ref.getDownloadURL();
+
+      await FirebaseFirestore.instance.collection('users').doc(_user!.uid).update({'photo': url});
+
+      if(mounted) {
+        setState(() {
+          _userData?['photo'] = url;
+        });
+      }
+
+    } catch (e) {
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('فشل رفع الصورة: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if(mounted) setState(() => _isUploading = false);
     }
   }
 
@@ -63,20 +92,44 @@ class _ProfilePageState extends State<ProfilePage> {
         padding: const EdgeInsets.all(16.0),
         children: [
           Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 children: [
-                  const CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.blue,
-                    child: Icon(Icons.person, size: 60, color: Colors.white),
+                  Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      CircleAvatar(
+                        radius: 60,
+                        backgroundColor: Colors.blue.shade100,
+                        backgroundImage: _userData?['photo'] != null
+                            ? NetworkImage(_userData!['photo'])
+                            : null,
+                        child: _userData?['photo'] == null
+                            ? Icon(Icons.person_pin, size: 70, color: Colors.blue.shade800)
+                            : null,
+                      ),
+                      if (_isUploading)
+                        const CircularProgressIndicator()
+                      else
+                        Material(
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(20),
+                          child: InkWell(
+                            onTap: _pickAndUploadImage,
+                            borderRadius: BorderRadius.circular(20),
+                            child: const Padding(
+                              padding: EdgeInsets.all(6.0),
+                              child: Icon(Icons.edit, color: Colors.white, size: 20),
+                            ),
+                          ),
+                        )
+                    ],
                   ),
                   const SizedBox(height: 20),
-                  _buildInfoRow(Icons.person_outline, 'الاسم', _userData?['name'] ?? 'غير متوفر'),
-                  const Divider(),
+                  Text(_userData?['name'] ?? 'اسم غير متوفر', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  Text(_user?.email ?? 'بريد إلكتروني غير متوفر', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600])),
+                  const SizedBox(height: 24),
                   _buildInfoRow(Icons.email_outlined, 'البريد الإلكتروني', _user?.email ?? 'غير متوفر'),
                   const Divider(),
                   _buildInfoRow(Icons.work_outline, 'الوظيفة 1', _userData?['profession1'] ?? 'غير متوفر'),
@@ -89,7 +142,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     _buildInfoRow(Icons.work_outline, 'الوظيفة 3', _userData?['profession3']),
                   ],
                   const Divider(),
-                  _buildInfoRow(Icons.phone_outlined, 'رقم الهاتف', _userData?['number'] ?? 'غير متوفر'),
+                  // --- تعديل: استخدام حقل 'phone' بدلاً من 'number' ---
+                  _buildInfoRow(Icons.phone_outlined, 'رقم الهاتف', _userData?['phone'] ?? 'غير متوفر'),
                 ],
               ),
             ),
@@ -108,7 +162,7 @@ class _ProfilePageState extends State<ProfilePage> {
           const SizedBox(width: 16),
           Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(width: 8),
-          Expanded(child: Text(value, style: TextStyle(color: Colors.grey.shade700))),
+          Expanded(child: Text(value, style: TextStyle(color: Colors.grey.shade800, fontSize: 16))),
         ],
       ),
     );

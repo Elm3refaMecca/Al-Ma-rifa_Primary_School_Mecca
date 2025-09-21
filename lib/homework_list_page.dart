@@ -1,5 +1,3 @@
-// homework_list_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -7,21 +5,26 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:math';
 
 class HomeworkListPage extends StatefulWidget {
   final String stage;
   final String grade;
+  final String term;
   final String className;
   final String subject;
   final String week;
+  final String day;
 
   const HomeworkListPage({
     super.key,
     required this.stage,
     required this.grade,
+    required this.term,
     required this.className,
     required this.subject,
     required this.week,
+    required this.day,
   });
 
   @override
@@ -32,14 +35,37 @@ class _HomeworkListPageState extends State<HomeworkListPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  bool _isAdmin = false;
 
-  // دالة لإظهار مربع حوار لإضافة أو تعديل واجب
+  @override
+  void initState() {
+    super.initState();
+    _checkUserRole();
+  }
+
+  Future<void> _checkUserRole() async {
+    User? user = _auth.currentUser;
+    if (user == null) return;
+    try {
+      final userData = await _firestore.collection('users').doc(user.uid).get();
+      if (mounted && userData.exists && (userData.data()?['role'] == 'admin')) {
+        setState(() {
+          _isAdmin = true;
+        });
+      }
+    } catch (e) {
+      debugPrint("Failed to check user role: $e");
+    }
+  }
+
+
   Future<void> _showAddEditDialog({DocumentSnapshot? homework}) async {
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
     final isEditing = homework != null;
 
     PlatformFile? selectedFile;
+    bool isUploading = false;
 
     if (isEditing) {
       final data = homework.data() as Map<String, dynamic>;
@@ -47,79 +73,67 @@ class _HomeworkListPageState extends State<HomeworkListPage> {
       descriptionController.text = data['description'] ?? '';
     }
 
-    // دالة لرفع الملف إلى Firebase Storage
     Future<(String, String)?> uploadFile(PlatformFile file, String subject) async {
-      if (_auth.currentUser == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('خطأ: يجب تسجيل الدخول لرفع الملفات.'), backgroundColor: Colors.red),
-        );
-        return null;
-      }
-
-      try {
-        final filePath = '$subject/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
-        final ref = _storage.ref(filePath);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('بدء رفع الملف...'), duration: Duration(seconds: 1)),
-        );
-
-        await ref.putData(file.bytes!);
-        String downloadUrl = await ref.getDownloadURL();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم رفع الملف بنجاح!'), backgroundColor: Colors.green),
-        );
-        return (downloadUrl, file.name);
-      } on FirebaseException catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('فشل رفع الملف: ${e.message}'), backgroundColor: Colors.red),
-        );
-        return null;
-      }
+      if (_auth.currentUser == null) return null;
+      final filePath = '$subject/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+      final ref = _storage.ref(filePath);
+      await ref.putData(file.bytes!);
+      String downloadUrl = await ref.getDownloadURL();
+      return (downloadUrl, file.name);
     }
 
-    // دالة لجلب اسم ورقم هاتف المعلم الحالي
     Future<Map<String, String?>> _getTeacherData() async {
       User? user = _auth.currentUser;
       if (user != null) {
         DocumentSnapshot userData = await _firestore.collection('users').doc(user.uid).get();
         final data = userData.data() as Map<String, dynamic>?;
-        return {
-          'name': data?['name'],
-          'phone': data?['number'], // ** التعديل: استخدام 'number' بدلاً من 'phone'
-        };
+        // --- تعديل: استخدام حقل 'phone' ---
+        return {'name': data?['name'], 'phone': data?['phone']};
       }
       return {'name': null, 'phone': null};
     }
 
     await showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text(isEditing ? 'تعديل الواجب' : 'إضافة واجب جديد لـ ${widget.week}'),
+              title: Text(isEditing ? 'تعديل الواجب' : 'إضافة واجب جديد'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    Text('المادة: ${widget.subject} - ${widget.term} - ${widget.week} - ${widget.day}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                    const SizedBox(height: 16),
                     TextField(controller: titleController, decoration: const InputDecoration(labelText: 'العنوان')),
-                    TextField(controller: descriptionController, decoration: const InputDecoration(labelText: 'الوصف')),
+                    TextField(controller: descriptionController, decoration: const InputDecoration(labelText: 'الوصف (اختياري)')),
                     const SizedBox(height: 20),
-                    if (selectedFile != null) Text('الملف المختار: ${selectedFile!.name}'),
+                    if (selectedFile != null) Text('الملف: ${selectedFile!.name}', overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 10),
-                    ElevatedButton.icon(
+                    OutlinedButton.icon(
                       icon: const Icon(Icons.attach_file),
-                      label: const Text('اختيار ملف (صورة أو PDF)'),
+                      label: const Text('اختيار ملف'),
                       onPressed: () async {
                         final result = await FilePicker.platform.pickFiles(
                           type: FileType.custom,
                           allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
                         );
                         if (result != null) {
+                          const maxSizeInBytes = 2 * 1024 * 1024; // 2 MB
+                          final file = result.files.first;
+                          if (file.size > maxSizeInBytes) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('حجم الملف يتجاوز الحد المسموح به (2 ميجابايت)'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
                           setDialogState(() {
-                            selectedFile = result.files.first;
+                            selectedFile = file;
                           });
                         }
                       },
@@ -128,67 +142,67 @@ class _HomeworkListPageState extends State<HomeworkListPage> {
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('إلغاء')),
+                TextButton(onPressed: isUploading ? null : () => Navigator.of(context).pop(), child: const Text('إلغاء')),
                 ElevatedButton(
-                  onPressed: () async {
+                  child: isUploading
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+                      : const Text('حفظ'),
+                  onPressed: isUploading ? null : () async {
                     if (titleController.text.isEmpty || _auth.currentUser == null) return;
 
-                    String? fileUrl, fileName, fileType;
+                    setDialogState(() { isUploading = true; });
 
-                    if (selectedFile != null) {
-                      final result = await uploadFile(selectedFile!, widget.subject);
-                      if (result != null) {
-                        fileUrl = result.$1;
-                        fileName = result.$2;
-                        fileType = selectedFile!.extension;
-                      } else {
-                        return; // إيقاف العملية إذا فشل الرفع
+                    try {
+                      String? fileUrl, fileName, fileType;
+
+                      if (selectedFile != null) {
+                        final result = await uploadFile(selectedFile!, widget.subject);
+                        if (result != null) {
+                          fileUrl = result.$1;
+                          fileName = result.$2;
+                          fileType = selectedFile!.extension;
+                        } else {
+                          throw Exception("فشل رفع الملف");
+                        }
+                      } else if (isEditing) {
+                        final data = homework.data() as Map<String, dynamic>;
+                        fileUrl = data['fileUrl']; fileName = data['fileName']; fileType = data['fileType'];
                       }
-                    } else if (isEditing) {
-                      final data = homework.data() as Map<String, dynamic>;
-                      fileUrl = data['fileUrl'];
-                      fileName = data['fileName'];
-                      fileType = data['fileType'];
-                    }
 
-                    final teacherData = await _getTeacherData();
+                      final teacherData = await _getTeacherData();
 
-                    Map<String, dynamic> data = {
-                      'title': titleController.text,
-                      'description': descriptionController.text,
-                      'week': widget.week,
-                      'stage': widget.stage,
-                      'grade': widget.grade,
-                      'class': widget.className,
-                      'subject': widget.subject,
-                      'teacherName': teacherData['name'],
-                      'teacherPhone': teacherData['phone'],
-                      'fileUrl': fileUrl,
-                      'fileName': fileName,
-                      'fileType': fileType,
-                      // ** الإضافة: حفظ معرّف المعلم وتاريخ الإنشاء من الخادم
-                      'teacherId': _auth.currentUser!.uid,
-                      'createdAt': FieldValue.serverTimestamp(),
-                    };
+                      Map<String, dynamic> data = {
+                        'title': titleController.text, 'description': descriptionController.text,
+                        'stage': widget.stage, 'grade': widget.grade, 'term': widget.term, 'class': widget.className,
+                        'subject': widget.subject, 'week': widget.week, 'day': widget.day,
+                        'teacherName': teacherData['name'], 'teacherPhone': teacherData['phone'],
+                        'teacherId': _auth.currentUser!.uid, 'fileUrl': fileUrl,
+                        'fileName': fileName, 'fileType': fileType,
+                        'createdAt': FieldValue.serverTimestamp(),
+                      };
 
-                    if (isEditing) {
-                      await _firestore.collection('homework').doc(homework.id).update(data);
+                      if (isEditing) {
+                        await _firestore.collection('homework').doc(homework.id).update(data);
+                      } else {
+                        await _firestore.collection('homework').add(data);
+                      }
+
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('تم تعديل الواجب بنجاح.'), backgroundColor: Colors.green),
+                        const SnackBar(content: Text('تم حفظ الواجب بنجاح'), backgroundColor: Colors.green),
                       );
-                    } else {
-                      await _firestore.collection('homework').add(data);
+                      Navigator.of(context).pop();
+
+                    } catch (e) {
+                      debugPrint("Error saving homework: $e");
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('تمت إضافة الواجب بنجاح. يمكنك تعديله أو حذفه خلال 10 دقائق.'),
-                          duration: Duration(seconds: 5),
-                          backgroundColor: Colors.blue,
-                        ),
+                        const SnackBar(content: Text('فشل الحفظ. تأكد من اتصالك بالإنترنت ومن صلاحياتك.'), backgroundColor: Colors.red),
                       );
+                    } finally {
+                      if(mounted) {
+                        setDialogState(() { isUploading = false; });
+                      }
                     }
-                    Navigator.of(context).pop();
                   },
-                  child: const Text('حفظ'),
                 ),
               ],
             );
@@ -198,7 +212,6 @@ class _HomeworkListPageState extends State<HomeworkListPage> {
     );
   }
 
-  // دالة لتحويل Timestamp إلى تنسيق تاريخ ووقت مقروء
   String _formatTimestamp(Timestamp? timestamp) {
     if (timestamp == null) return 'غير متوفر';
     return intl.DateFormat('yyyy/MM/dd - hh:mm a', 'ar').format(timestamp.toDate());
@@ -210,28 +223,37 @@ class _HomeworkListPageState extends State<HomeworkListPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('واجبات ${widget.subject} - ${widget.week}'),
+        title: Text('${widget.week} - ${widget.day}'),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _firestore
             .collection('homework')
             .where('stage', isEqualTo: widget.stage)
             .where('grade', isEqualTo: widget.grade)
+            .where('term', isEqualTo: widget.term)
             .where('class', isEqualTo: widget.className)
             .where('subject', isEqualTo: widget.subject)
             .where('week', isEqualTo: widget.week)
+            .where('day', isEqualTo: widget.day)
             .orderBy('createdAt', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            print(snapshot.error);
-            return Center(child: Text('حدث خطأ. تأكد من إنشاء الفهرس في Firestore. \n${snapshot.error}'));
+            debugPrint("Firestore Stream Error: ${snapshot.error}");
+            return Center(child: Text('حدث خطأ أثناء تحميل البيانات: ${snapshot.error}'));
           }
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('لا توجد واجبات مضافة لهذا الأسبوع.'));
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.inbox, size: 80, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('لا توجد واجبات مضافة لهذا اليوم.', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                ],
+              ),
+            );
           }
 
           return ListView.builder(
@@ -241,26 +263,24 @@ class _HomeworkListPageState extends State<HomeworkListPage> {
               var doc = snapshot.data!.docs[index];
               var data = doc.data() as Map<String, dynamic>;
 
-              // ** الإضافة: التحقق إذا كان المستخدم الحالي هو صاحب الواجب
               final String? teacherId = data['teacherId'];
               final bool isOwner = currentUserId != null && currentUserId == teacherId;
-
-              // ** الإضافة: التحقق من الوقت المتبقي للتعديل
               final Timestamp? createdAtTimestamp = data['createdAt'];
-              bool isEditable = false;
+              bool isEditableWithinTime = false;
               if (createdAtTimestamp != null) {
-                final createdAt = createdAtTimestamp.toDate();
-                isEditable = DateTime.now().difference(createdAt).inMinutes < 10;
+                isEditableWithinTime = DateTime.now().difference(createdAtTimestamp.toDate()).inMinutes < 10;
               }
 
+              final bool canModify = _isAdmin || (isOwner && isEditableWithinTime);
+
               IconData fileIcon = Icons.attach_file;
-              if (data['fileType'] == 'pdf') fileIcon = Icons.picture_as_pdf;
-              if (['jpg', 'jpeg', 'png'].contains(data['fileType'])) fileIcon = Icons.image;
+              final fileType = data['fileType']?.toString().toLowerCase();
+              if (fileType == 'pdf') fileIcon = Icons.picture_as_pdf;
+              if (['jpg', 'jpeg', 'png'].contains(fileType)) fileIcon = Icons.image;
+
+              final randomColor = Colors.primaries[Random().nextInt(Colors.primaries.length)].shade100;
 
               return Card(
-                elevation: 3,
-                margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: Padding(
                   padding: const EdgeInsets.all(12.0),
                   child: Column(
@@ -268,52 +288,50 @@ class _HomeworkListPageState extends State<HomeworkListPage> {
                     children: [
                       ListTile(
                         contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(backgroundColor: randomColor, child: Icon(Icons.assignment, color: Colors.black54)),
                         title: Text(data['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                         subtitle: Padding(
                           padding: const EdgeInsets.only(top: 4.0),
-                          child: Text(data['description'] ?? 'لا يوجد وصف'),
+                          child: Text(data['description'] ?? 'لا يوجد وصف', style: const TextStyle(color: Colors.black54)),
                         ),
-                        // ** التعديل: إظهار الأزرار فقط لصاحب الواجب
-                        trailing: isOwner
-                            ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.green),
-                              // ** التعديل: تعطيل الزر إذا انتهى الوقت
-                              onPressed: isEditable ? () => _showAddEditDialog(homework: doc) : null,
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: isEditable
-                                  ? () async {
-                                if(data['fileUrl'] != null) {
-                                  try {
-                                    await _storage.refFromURL(data['fileUrl']).delete();
-                                  } on FirebaseException catch(e) {
-                                    print("Failed to delete file from storage: $e");
-                                  }
+                        trailing: (_isAdmin || isOwner)
+                            ? PopupMenuButton<String>(
+                          onSelected: (value) async {
+                            if (value == 'edit') {
+                              _showAddEditDialog(homework: doc);
+                            } else if (value == 'delete') {
+                              try {
+                                if (data['fileUrl'] != null && (data['fileUrl'] as String).isNotEmpty) {
+                                  await _storage.refFromURL(data['fileUrl']).delete();
                                 }
                                 await _firestore.collection('homework').doc(doc.id).delete();
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('تم حذف الواجب بنجاح')),
+                                );
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('حدث خطأ أثناء الحذف: قد يكون الملف غير موجود'), backgroundColor: Colors.red),
+                                );
                               }
-                                  : null,
-                            ),
+                            }
+                          },
+                          enabled: canModify,
+                          itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                            const PopupMenuItem<String>(value: 'edit', child: Text('تعديل')),
+                            const PopupMenuItem<String>(value: 'delete', child: Text('حذف')),
                           ],
                         )
-                            : null, // لا تظهر شيئاً إذا لم يكن المالك
+                            : null,
                       ),
-                      // ** الإضافة: إظهار رسالة إذا لم يعد الواجب قابلاً للتعديل
-                      if (isOwner && !isEditable)
+                      if (isOwner && !isEditableWithinTime && !_isAdmin)
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 8.0),
-                          child: Text(
-                            'انتهت فترة التعديل (10 دقائق).',
-                            style: TextStyle(color: Colors.red.shade700, fontSize: 12),
-                          ),
+                          padding: const EdgeInsets.only(bottom: 8.0, right: 16.0),
+                          child: Text('انتهت فترة التعديل/الحذف (10 دقائق)', style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
                         ),
                       if (data['fileUrl'] != null)
                         Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
+                          padding: const EdgeInsets.only(top: 8.0, right: 16.0),
                           child: ActionChip(
                             avatar: Icon(fileIcon, color: Colors.white),
                             label: Text(data['fileName'] ?? 'عرض المرفق', style: const TextStyle(color: Colors.white)),
@@ -327,14 +345,15 @@ class _HomeworkListPageState extends State<HomeworkListPage> {
                           ),
                         ),
                       const Divider(height: 24),
-                      Text(
-                        'نشر بواسطة: ${data['teacherName'] ?? 'غير معروف'}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'تاريخ النشر: ${_formatTimestamp(data['createdAt'])}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(child: Text('المعلم: ${data['teacherName'] ?? 'غير معروف'}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700))),
+                            Text(_formatTimestamp(data['createdAt']), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -344,10 +363,11 @@ class _HomeworkListPageState extends State<HomeworkListPage> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddEditDialog(),
         tooltip: 'إضافة واجب جديد',
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.add),
+        label: const Text('إضافة واجب'),
       ),
     );
   }
