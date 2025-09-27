@@ -1,4 +1,4 @@
-import 'package:appweb1/main.dart';
+import 'package:appweb1/student_profile_page.dart';
 import 'package:appweb1/teacher_profile_view_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -14,13 +14,15 @@ class StudentViewPage extends StatefulWidget {
 }
 
 class _StudentViewPageState extends State<StudentViewPage> {
-  String? _selectedStage, _selectedGrade, _selectedTerm, _selectedClass, _selectedWeek, _selectedDay, _selectedSubject;
-  int _currentStep = 0;
+  bool _isLoading = true;
+  String? _studentName;
 
-  final List<String> stages = ['المرحلة الابتدائية', 'المرحلة المتوسطة', 'المرحلة الثانوية'];
-  final List<String> grades = ['الصف الأول', 'الصف الثاني', 'الصف الثالث', 'الصف الرابع', 'الصف الخامس', 'الصف السادس'];
-  final List<String> terms = ['الترم الأول', 'الترم الثاني', 'الترم الثالث'];
-  final List<String> classes = ['الفصل 1', 'الفصل 2', 'الفصل 3', 'الفصل 4', 'الفصل 5', 'الفصل 6'];
+  // بيانات الطالب الثابتة
+  String? _fixedStage, _fixedGrade, _fixedTerm, _fixedClass;
+
+  // اختيارات الطالب المتغيرة
+  String? _selectedWeek, _selectedDay, _selectedSubject;
+
   final List<String> subjects = [
     'رياضيات', 'لغتي', 'إسلاميات', 'علوم', 'نشاط', 'انجليزي',
     'اجتماعيات', 'فنية', 'حياتية', 'بدنية', 'رقمية', 'تفكير', 'مصدر'
@@ -28,98 +30,124 @@ class _StudentViewPageState extends State<StudentViewPage> {
   final List<String> weeks = List.generate(16, (index) => 'الأسبوع ${index + 1}');
   final List<String> days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 
+  @override
+  void initState() {
+    super.initState();
+    _fetchStudentData();
+  }
+
+  Future<void> _fetchStudentData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user?.email == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('students')
+          .where('email', isEqualTo: user!.email)
+          .limit(1)
+          .get();
+
+      if (mounted && querySnapshot.docs.isNotEmpty) {
+        final data = querySnapshot.docs.first.data();
+        setState(() {
+          _studentName = data['name'];
+          // --- تعديل: استخدام أسماء الحقول الصحيحة وتخزينها في متغيرات ثابتة ---
+          _fixedStage = data['stages'];
+          _fixedGrade = data['grades'];
+          _fixedTerm = data['terms'];
+          _fixedClass = data['classes'];
+          _isLoading = false;
+        });
+      } else {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _signOutAndGoToLogin() async {
     await FirebaseAuth.instance.signOut();
     if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const TeacherLoginPage()),
-            (Route<dynamic> route) => false,
-      );
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (Route<dynamic> route) => false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // --- إضافة: شرط التحقق من إتمام كل الاختيارات ---
-    final bool allSelectionsMade = _selectedStage != null &&
-        _selectedGrade != null &&
-        _selectedTerm != null &&
-        _selectedClass != null &&
+    final bool canShowHomework = _fixedStage != null &&
+        _fixedGrade != null &&
+        _fixedTerm != null &&
+        _fixedClass != null &&
         _selectedWeek != null &&
         _selectedDay != null;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('عرض الواجبات المدرسية'),
-        leading: IconButton(
-          icon: const Icon(Icons.logout),
-          tooltip: 'العودة لتسجيل الدخول',
-          onPressed: _signOutAndGoToLogin,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_studentName != null ? 'أهلاً بك، $_studentName' : 'عرض الواجبات', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('بوابة الطالب', style: TextStyle(fontSize: 14, color: Colors.white70)),
+          ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_outline),
+            tooltip: 'الملف الشخصي',
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentProfilePage())),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'تسجيل الخروج',
+            onPressed: _signOutAndGoToLogin,
+          ),
+        ],
+        automaticallyImplyLeading: false,
       ),
-      body: ListView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+        padding: const EdgeInsets.all(16.0),
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Image.asset('assets/e2.png', height: 60),
+          // --- تعديل: عرض بيانات الطالب الثابتة ---
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('بياناتك الدراسية', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.blue[800])),
+                  const SizedBox(height: 8),
+                  _buildInfoTile(Icons.layers, 'المرحلة', _fixedStage),
+                  _buildInfoTile(Icons.school, 'الصف', _fixedGrade),
+                  _buildInfoTile(Icons.class_, 'الفصل', _fixedClass),
+                  _buildInfoTile(Icons.calendar_today, 'الترم', _fixedTerm),
+                ],
+              ),
+            ),
           ),
-          Stepper(
-            physics: const ClampingScrollPhysics(),
-            currentStep: _currentStep,
-            // --- تعديل: منع التنقل بالضغط على الخطوات لفرض التسلسل ---
-            onStepTapped: null,
-            onStepContinue: () {
-              // --- تعديل: الانتقال للخطوة التالية فقط إذا لم تكن الأخيرة ---
-              if (_currentStep < _buildSteps().length - 1) {
-                setState(() {
-                  _currentStep += 1;
-                });
-              }
-            },
-            onStepCancel: () {
-              if (_currentStep > 0) {
-                setState(() {
-                  _currentStep -= 1;
-                });
-              }
-            },
-            // --- تعديل: بناء أزرار التحكم بشكل مخصص ---
-            controlsBuilder: (context, details) {
-              bool canContinue = false;
-              switch (details.currentStep) {
-                case 0: canContinue = _selectedStage != null; break;
-                case 1: canContinue = _selectedGrade != null; break;
-                case 2: canContinue = _selectedTerm != null; break;
-                case 3: canContinue = _selectedClass != null; break;
-                case 4: canContinue = _selectedWeek != null; break;
-                case 5: canContinue = _selectedDay != null; break;
-              }
 
-              return Padding(
-                padding: const EdgeInsets.only(top: 16.0),
-                child: Row(
-                  children: [
-                    if (details.currentStep < _buildSteps().length - 1)
-                      ElevatedButton(
-                        onPressed: canContinue ? details.onStepContinue : null,
-                        child: const Text('متابعة'),
-                      ),
-                    if (details.currentStep != 0)
-                      TextButton(
-                        onPressed: details.onStepCancel,
-                        child: const Text('رجوع'),
-                      ),
-                  ],
-                ),
-              );
-            },
-            steps: _buildSteps(),
-          ),
-          // --- تعديل: عرض الواجبات فقط عند إكمال جميع الاختيارات ---
-          if (allSelectionsMade) ...[
+          const SizedBox(height: 24),
+
+          // --- تعديل: قسم اختيار الأسبوع واليوم ---
+          Text('اختر لعرض الواجبات', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.blue[800])),
+          const SizedBox(height: 16),
+          _buildDropdown(weeks, _selectedWeek, '1. اختر الأسبوع', (val) => setState(() => _selectedWeek = val)),
+          const SizedBox(height: 12),
+          _buildDropdown(days, _selectedDay, '2. اختر اليوم', (val) => setState(() => _selectedDay = val)),
+          const SizedBox(height: 12),
+          _buildDropdown(subjects, _selectedSubject, 'تصفية حسب المادة (اختياري)', (val) {
+            setState(() => _selectedSubject = val);
+          }, isOptional: true),
+
+          if (canShowHomework) ...[
             const Divider(height: 40, thickness: 1),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
               child: Text(
                 'واجبات يوم: ${_selectedDay!}',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.blue[800]),
@@ -133,72 +161,14 @@ class _StudentViewPageState extends State<StudentViewPage> {
     );
   }
 
-  List<Step> _buildSteps() {
-    return [
-      Step(
-        title: const Text('المرحلة'),
-        content: _buildDropdown(stages, _selectedStage, 'اختر المرحلة', (val) => setState(() {
-          _selectedStage = val;
-          _selectedGrade = null; _selectedTerm = null; _selectedClass = null;
-          _selectedWeek = null; _selectedDay = null; _selectedSubject = null;
-        })),
-        isActive: _currentStep >= 0,
-        state: _selectedStage != null ? StepState.complete : StepState.indexed,
-      ),
-      Step(
-        title: const Text('الصف'),
-        content: _buildDropdown(grades, _selectedGrade, 'اختر الصف', (val) => setState(() {
-          _selectedGrade = val;
-          _selectedTerm = null; _selectedClass = null; _selectedWeek = null;
-          _selectedDay = null; _selectedSubject = null;
-        })),
-        isActive: _currentStep >= 1,
-        state: _selectedGrade != null ? StepState.complete : StepState.indexed,
-      ),
-      Step(
-        title: const Text('الترم'),
-        content: _buildDropdown(terms, _selectedTerm, 'اختر الترم', (val) => setState(() {
-          _selectedTerm = val;
-          _selectedClass = null; _selectedWeek = null; _selectedDay = null; _selectedSubject = null;
-        })),
-        isActive: _currentStep >= 2,
-        state: _selectedTerm != null ? StepState.complete : StepState.indexed,
-      ),
-      Step(
-        title: const Text('الفصل'),
-        content: _buildDropdown(classes, _selectedClass, 'اختر الفصل', (val) => setState(() {
-          _selectedClass = val;
-          _selectedWeek = null; _selectedDay = null; _selectedSubject = null;
-        })),
-        isActive: _currentStep >= 3,
-        state: _selectedClass != null ? StepState.complete : StepState.indexed,
-      ),
-      Step(
-        title: const Text('الأسبوع'),
-        content: _buildDropdown(weeks, _selectedWeek, 'اختر الأسبوع', (val) => setState(() {
-          _selectedWeek = val;
-          _selectedDay = null; _selectedSubject = null;
-        })),
-        isActive: _currentStep >= 4,
-        state: _selectedWeek != null ? StepState.complete : StepState.indexed,
-      ),
-      Step(
-        title: const Text('اليوم والمادة'),
-        content: Column(
-          children: [
-            _buildDropdown(days, _selectedDay, 'اختر اليوم', (val) => setState(() {
-              _selectedDay = val;
-            })),
-            const SizedBox(height: 12),
-            _buildDropdown(subjects, _selectedSubject, 'تصفية حسب المادة (اختياري)', (val) {
-              setState(() => _selectedSubject = val);
-            }, isOptional: true),
-          ],
-        ),
-        isActive: _currentStep >= 5,
-        state: _selectedDay != null ? StepState.complete : StepState.indexed,
-      ),
-    ];
+  // --- إضافة: ويدجت لعرض بيانات الطالب ---
+  Widget _buildInfoTile(IconData icon, String title, String? subtitle) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: Colors.blue.shade700),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(subtitle ?? 'غير محدد', style: TextStyle(fontSize: 16, color: Colors.grey.shade800)),
+    );
   }
 
   Widget _buildDropdown(List<String> items, String? currentValue, String hint, ValueChanged<String?> onChanged, {bool isOptional = false}) {
@@ -211,6 +181,8 @@ class _StudentViewPageState extends State<StudentViewPage> {
       decoration: InputDecoration(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        filled: true,
+        fillColor: Colors.white,
         suffixIcon: (isOptional && currentValue != null)
             ? IconButton(
           icon: const Icon(Icons.clear),
@@ -227,10 +199,10 @@ class _StudentViewPageState extends State<StudentViewPage> {
 
   Widget _buildHomeworkList() {
     Query query = FirebaseFirestore.instance.collection('homework')
-        .where('stage', isEqualTo: _selectedStage)
-        .where('grade', isEqualTo: _selectedGrade)
-        .where('term', isEqualTo: _selectedTerm)
-        .where('class', isEqualTo: _selectedClass)
+        .where('stage', isEqualTo: _fixedStage)
+        .where('grade', isEqualTo: _fixedGrade)
+        .where('term', isEqualTo: _fixedTerm)
+        .where('class', isEqualTo: _fixedClass)
         .where('week', isEqualTo: _selectedWeek)
         .where('day', isEqualTo: _selectedDay);
 
@@ -251,7 +223,7 @@ class _StudentViewPageState extends State<StudentViewPage> {
         if (snapshot.data!.docs.isEmpty) return const Center(child: Padding(padding: EdgeInsets.all(20.0), child: Text('لا توجد واجبات متاحة لهذا التحديد.')));
 
         return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 0),
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: snapshot.data!.docs.length,
