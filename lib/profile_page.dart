@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -35,6 +36,7 @@ class _ProfilePageState extends State<ProfilePage> {
           });
         }
       } catch (e) {
+        debugPrint('Error fetching user data: $e');
         if (mounted) setState(() { _isLoading = false; });
       }
     } else {
@@ -42,6 +44,8 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  /// Picks an image from the gallery and uploads it to Firebase Storage.
+  /// The storage path is 'photosT/{userId}.jpg' to match security rules.
   Future<void> _pickAndUploadImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
@@ -52,16 +56,32 @@ class _ProfilePageState extends State<ProfilePage> {
 
     try {
       final file = File(pickedFile.path);
-      // --- تعديل: تغيير مسار الرفع إلى photosT ---
+
       final ref = FirebaseStorage.instance.ref('photosT/${_user!.uid}.jpg');
+
       await ref.putFile(file);
       final url = await ref.getDownloadURL();
 
-      await FirebaseFirestore.instance.collection('users').doc(_user!.uid).update({'photo': url});
+      // --- ( تعديل ) ---
+      // Add a unique query parameter (timestamp) to the URL.
+      // This is a common technique to "bust" the image cache, forcing Flutter
+      // to re-download the image because it sees a new, unique URL.
+      final uniqueUrl = '$url?v=${DateTime.now().millisecondsSinceEpoch}';
+
+      // This now uses .set() with merge:true. It's safer because it will
+      // CREATE the document if it doesn't exist, or just update the 'photo' field
+      // if it does. This prevents errors and ensures the photo is always saved.
+      await FirebaseFirestore.instance.collection('users').doc(_user!.uid).set(
+        {'photo': uniqueUrl}, // Save the new unique URL
+        SetOptions(merge: true),
+      );
 
       if(mounted) {
-        setState(() {
-          _userData?['photo'] = url;
+        // Update the UI with the new photo instantly.
+        setState(()   {
+          // If _userData was null, initialize it before setting the photo.
+          _userData ??= {};
+          _userData!['photo'] = uniqueUrl; // Update state with the unique URL
         });
       }
 
@@ -78,6 +98,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final Color primaryColor = Theme.of(context).primaryColor;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('الملف الشخصي'),
@@ -86,8 +108,6 @@ class _ProfilePageState extends State<ProfilePage> {
           ? const Center(child: CircularProgressIndicator())
           : _user == null
           ? const Center(child: Text('الرجاء تسجيل الدخول لعرض الملف الشخصي.'))
-          : _userData == null
-          ? const Center(child: Text('لم يتم العثور على بيانات المستخدم.'))
           : ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
@@ -101,19 +121,19 @@ class _ProfilePageState extends State<ProfilePage> {
                     children: [
                       CircleAvatar(
                         radius: 60,
-                        backgroundColor: Colors.blue.shade100,
+                        backgroundColor: primaryColor.withOpacity(0.1),
                         backgroundImage: _userData?['photo'] != null
                             ? NetworkImage(_userData!['photo'])
                             : null,
                         child: _userData?['photo'] == null
-                            ? Icon(Icons.person_pin, size: 70, color: Colors.blue.shade800)
+                            ? Icon(Icons.person_pin, size: 70, color: primaryColor)
                             : null,
                       ),
                       if (_isUploading)
                         const CircularProgressIndicator()
                       else
                         Material(
-                          color: Colors.blue,
+                          color: primaryColor,
                           borderRadius: BorderRadius.circular(20),
                           child: InkWell(
                             onTap: _pickAndUploadImage,
@@ -132,17 +152,12 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(height: 24),
                   _buildInfoRow(Icons.email_outlined, 'البريد الإلكتروني', _user?.email ?? 'غير متوفر'),
                   const Divider(),
-                  _buildInfoRow(Icons.work_outline, 'الوظيفة 1', _userData?['profession1'] ?? 'غير متوفر'),
-                  if (_userData?['profession2'] != null && (_userData!['profession2'] as String).isNotEmpty) ...[
-                    const Divider(),
-                    _buildInfoRow(Icons.work_outline, 'الوظيفة 2', _userData?['profession2']),
-                  ],
-                  if (_userData?['profession3'] != null && (_userData!['profession3'] as String).isNotEmpty) ...[
-                    const Divider(),
-                    _buildInfoRow(Icons.work_outline, 'الوظيفة 3', _userData?['profession3']),
-                  ],
-                  const Divider(),
-                  // --- تعديل: استخدام حقل 'phone' بدلاً من 'number' ---
+                  // Loop to display all assigned subjects.
+                  for (int i = 1; i <= 14; i++)
+                    if (_userData?['profession$i'] != null && (_userData!['profession$i'] as String).isNotEmpty) ...[
+                      _buildInfoRow(Icons.work_outline, 'المادة $i', _userData?['profession$i']),
+                      const Divider(),
+                    ],
                   _buildInfoRow(Icons.phone_outlined, 'رقم الهاتف', _userData?['phone'] ?? 'غير متوفر'),
                 ],
               ),
@@ -158,7 +173,7 @@ class _ProfilePageState extends State<ProfilePage> {
       padding: const EdgeInsets.symmetric(vertical: 12.0),
       child: Row(
         children: [
-          Icon(icon, color: Colors.blue.shade700),
+          Icon(icon, color: Theme.of(context).primaryColor),
           const SizedBox(width: 16),
           Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(width: 8),
@@ -168,3 +183,4 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 }
+

@@ -16,12 +16,12 @@ class WelcomePage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'مرحباً بك في بوابة الواجبات',
+                'مدارس المعرفة الاهلية بمكة المكرمة',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: Colors.blue.shade700,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 40),

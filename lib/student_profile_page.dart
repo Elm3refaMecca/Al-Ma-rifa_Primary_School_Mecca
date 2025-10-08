@@ -20,34 +20,39 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     _fetchStudentData();
   }
 
+  // --- ( تعديل جوهري ) ---
+  // تم تغيير طريقة جلب البيانات لتكون مباشرة عبر UID الخاص بالطالب
+  // هذا يضمن الحصول على البيانات بشكل صحيح وموثوق
   Future<void> _fetchStudentData() async {
-    if (_user?.email == null) {
+    if (_user == null) {
       if (mounted) setState(() => _isLoading = false);
       return;
     }
 
     try {
-      final querySnapshot = await FirebaseFirestore.instance
+      final docSnapshot = await FirebaseFirestore.instance
           .collection('students')
-          .where('email', isEqualTo: _user!.email)
-          .limit(1)
+          .doc(_user!.uid)
           .get();
 
       if (mounted) {
-        if (querySnapshot.docs.isNotEmpty) {
+        if (docSnapshot.exists) {
           setState(() {
-            _studentData = querySnapshot.docs.first.data();
+            _studentData = docSnapshot.data();
           });
         }
         setState(() => _isLoading = false);
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
+      // يمكنك إضافة رسالة خطأ هنا إذا أردت
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final Color primaryColor = Theme.of(context).primaryColor;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('الملف الشخصي للطالب'),
@@ -68,11 +73,12 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                 children: [
                   CircleAvatar(
                     radius: 50,
-                    backgroundColor: Colors.blue.shade100,
-                    child: Icon(Icons.person_pin, size: 60, color: Colors.blue.shade800),
+                    backgroundColor: primaryColor.withOpacity(0.1),
+                    child: Icon(Icons.person_pin, size: 60, color: primaryColor),
                   ),
                   const SizedBox(height: 20),
                   Text(
+                    // تم توحيد أسماء الحقول
                     _studentData?['name'] ?? 'اسم غير متوفر',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                   ),
@@ -83,16 +89,13 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                   const SizedBox(height: 24),
                   _buildInfoRow(Icons.email_outlined, 'البريد الإلكتروني', _user?.email ?? 'غير متوفر'),
                   const Divider(),
-                  // --- تعديل: استخدام أسماء الحقول الصحيحة ---
-                  _buildInfoRow(Icons.phone_outlined, 'هاتف ولي الأمر', _studentData?['guardianPhone'] ?? 'غير متوفر'),
+                  _buildInfoRow(Icons.phone_outlined, 'هاتف ولي الأمر', _studentData?['guardian_phone'] ?? 'غير متوفر'),
                   const Divider(),
                   _buildInfoRow(Icons.layers_outlined, 'المرحلة', _studentData?['stages'] ?? 'غير متوفر'),
                   const Divider(),
                   _buildInfoRow(Icons.school_outlined, 'الصف', _studentData?['grades'] ?? 'غير متوفر'),
                   const Divider(),
                   _buildInfoRow(Icons.class_outlined, 'الفصل', _studentData?['classes'] ?? 'غير متوفر'),
-                  const Divider(),
-                  _buildInfoRow(Icons.calendar_today_outlined, 'الترم', _studentData?['terms'] ?? 'غير متوفر'),
                 ],
               ),
             ),
@@ -107,7 +110,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
       padding: const EdgeInsets.symmetric(vertical: 12.0),
       child: Row(
         children: [
-          Icon(icon, color: Colors.blue.shade700),
+          Icon(icon, color: Theme.of(context).primaryColor),
           const SizedBox(width: 16),
           Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(width: 8),

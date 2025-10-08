@@ -8,6 +8,8 @@ class TeacherProfileViewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Color primaryColor = Theme.of(context).primaryColor;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('ملف المعلم الشخصي'),
@@ -51,10 +53,10 @@ class TeacherProfileViewPage extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 50,
-                        backgroundColor: Colors.blue.shade100,
+                        backgroundColor: primaryColor.withOpacity(0.1),
                         backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
                         child: photoUrl == null
-                            ? Icon(Icons.person, size: 60, color: Colors.blue.shade800)
+                            ? Icon(Icons.person, size: 60, color: primaryColor)
                             : null,
                       ),
                       const SizedBox(height: 20),
@@ -83,17 +85,21 @@ class TeacherProfileViewPage extends StatelessWidget {
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.blue.shade700),
-          const SizedBox(width: 16),
-          Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(width: 8),
-          Expanded(child: Text(value, style: TextStyle(color: Colors.grey.shade800, fontSize: 16))),
-        ],
-      ),
+    return Builder(
+        builder: (context) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12.0),
+            child: Row(
+              children: [
+                Icon(icon, color: Theme.of(context).primaryColor),
+                const SizedBox(width: 16),
+                Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(width: 8),
+                Expanded(child: Text(value, style: TextStyle(color: Colors.grey.shade800, fontSize: 16))),
+              ],
+            ),
+          );
+        }
     );
   }
 }

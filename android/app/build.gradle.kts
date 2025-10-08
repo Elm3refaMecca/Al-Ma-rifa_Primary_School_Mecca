@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.appweb1"
+    namespace = "com.example.almarefamecca"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 

@@ -8,10 +8,10 @@ class StudentViewPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('الواجبات المدرسية'),
+        title: const Text('اختبار مدرسيات المدرسية'),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        // جلب البيانات من collection الواجبات وترتيبها بالأحدث أولاً
+        // جلب البيانات من collection اختبار مدرسيات وترتيبها بالأحدث أولاً
         stream: FirebaseFirestore.instance.collection('assignments').orderBy('createdAt', descending: true).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
