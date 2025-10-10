@@ -1,17 +1,53 @@
-import 'package:almarefamecca/add.dart';
-import 'package:almarefamecca/firebase_options.dart';
-import 'package:almarefamecca/student_view.dart';
+// main.dart
+
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
-// --- (إضافة جديدة) المكتبات المطلوبة ---
 import 'package:lottie/lottie.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-// --- (إضافة جديدة) دالة الاتصال بواتساب ---
+// --- [تعديل] تم تحويل الاستدعاء المباشر إلى استدعاء مؤجل لتحسين سرعة التحميل ---
+import 'package:almarefamecca/add.dart' deferred as add_page;
+import 'package:almarefamecca/student_view.dart' deferred as student_view_page;
+import 'package:almarefamecca/firebase_options.dart';
+
+// --- [جديد] ويدجت بسيطة للتحميل المؤجل ---
+class DeferredLoader extends StatefulWidget {
+  final Future<void> libraryFuture;
+  final Widget Function() builder;
+
+  const DeferredLoader({
+    required this.libraryFuture,
+    required this.builder,
+    super.key
+  });
+
+  @override
+  _DeferredLoaderState createState() => _DeferredLoaderState();
+}
+
+class _DeferredLoaderState extends State<DeferredLoader> {
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+      future: widget.libraryFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done) {
+          if (snapshot.hasError) {
+            return Scaffold(body: Center(child: Text('حدث خطأ أثناء تحميل الصفحة: ${snapshot.error}')));
+          }
+          return widget.builder();
+        }
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      },
+    );
+  }
+}
+
+
 Future<void> _launchWhatsApp(BuildContext context) async {
   const phoneNumber = '966569064173'; // رقم الهاتف بدون + أو 00
   final Uri whatsappUri = Uri.parse('https://wa.me/$phoneNumber');
@@ -25,7 +61,6 @@ Future<void> _launchWhatsApp(BuildContext context) async {
   }
 }
 
-// --- (إضافة جديدة) ويدجت زر الواتساب لسهولة الاستخدام ---
 Widget _buildWhatsAppButton(BuildContext context) {
   return Positioned(
     bottom: 16,
@@ -150,10 +185,17 @@ class TeacherLoginApp extends StatelessWidget {
         ),
       ),
       initialRoute: '/',
+      // --- [تعديل] تم تبديل الصفحات بويدجت التحميل المؤجل الخاصة بها ---
       routes: {
         '/': (context) => const AuthWrapper(),
-        '/add': (context) => const AddPage(),
-        '/student_view': (context) => const StudentViewPage(),
+        '/add': (context) => DeferredLoader(
+          libraryFuture: add_page.loadLibrary(),
+          builder: () => add_page.AddPage(),
+        ),
+        '/student_view': (context) => DeferredLoader(
+          libraryFuture: student_view_page.loadLibrary(),
+          builder: () => student_view_page.StudentViewPage(),
+        ),
       },
     );
   }
@@ -164,14 +206,11 @@ class AuthWrapper extends StatelessWidget {
 
   Future<String> _getUserRole(User user) async {
     try {
-      // التحقق من المعلم باستخدام الـ UID
       final teacherDoc =
       await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       if (teacherDoc.exists) {
         return 'teacher';
       }
-
-      // التحقق من الطالب باستخدام الـ UID مباشرةً
       final studentDoc = await FirebaseFirestore.instance
           .collection('students')
           .doc(user.uid)
@@ -179,8 +218,6 @@ class AuthWrapper extends StatelessWidget {
       if (studentDoc.exists) {
         return 'student';
       }
-
-      // إذا لم يكن معلمًا أو طالبًا، يتم تسجيل الخروج
       await FirebaseAuth.instance.signOut();
       return 'unauthorized';
     } catch (e) {
@@ -209,10 +246,17 @@ class AuthWrapper extends StatelessWidget {
               }
 
               switch (roleSnapshot.data) {
+              // --- [تعديل] تم استبدال الاستدعاء المباشر بويدجت التحميل المؤجل ---
                 case 'teacher':
-                  return const AddPage();
+                  return DeferredLoader(
+                    libraryFuture: add_page.loadLibrary(),
+                    builder: () => add_page.AddPage(),
+                  );
                 case 'student':
-                  return const StudentViewPage();
+                  return DeferredLoader(
+                    libraryFuture: student_view_page.loadLibrary(),
+                    builder: () => student_view_page.StudentViewPage(),
+                  );
                 default:
                   return const WelcomePage();
               }
@@ -226,13 +270,15 @@ class AuthWrapper extends StatelessWidget {
   }
 }
 
+
+// باقي الكود في ملف main.dart يبقى كما هو بدون تغيير
+// WelcomePage, LoginPage, etc.
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // --- [MODIFIED] Wrapped body in a Stack ---
       body: Stack(
         children: [
           Center(
@@ -290,7 +336,6 @@ class WelcomePage extends StatelessWidget {
               ),
             ),
           ),
-          // --- [ADDED] WhatsApp floating button ---
           _buildWhatsAppButton(context),
         ],
       ),
@@ -335,7 +380,6 @@ class _LoginPageState extends State<LoginPage> {
           isAuthorized = true;
         }
       } else if (widget.accountType == 'student') {
-        // التحقق من الطالب باستخدام UID
         final doc = await _firestore.collection('students').doc(user.uid).get();
         if (doc.exists) {
           isAuthorized = true;
@@ -382,7 +426,6 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
-        // --- [ADDED] School logo in AppBar ---
         actions: [
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -390,7 +433,6 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ],
       ),
-      // --- [MODIFIED] Wrapped body in a Stack ---
       body: Stack(
         children: [
           Center(
@@ -456,7 +498,6 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           ),
-          // --- [ADDED] WhatsApp floating button ---
           _buildWhatsAppButton(context),
         ],
       ),
