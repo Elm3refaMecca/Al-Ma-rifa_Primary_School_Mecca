@@ -17,7 +17,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:percent_indicator/percent_indicator.dart';
 import 'package:universal_html/html.dart' as html;
 // --- (إضافة جديدة) المكتبات المطلوبة ---
-import 'package:lottie/lottie.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AddPage extends StatefulWidget {
@@ -340,7 +339,6 @@ class _AddPageState extends State<AddPage> {
                 child: SizedBox(
                   width: 120,
                   height: 120,
-                  child: Lottie.asset('assets/whatsapp-button.json'),
                 ),
               ),
             ),
@@ -546,69 +544,69 @@ class _GradeEntrySelectionPageState extends State<GradeEntrySelectionPage> {
     final classSubjects = <String, Map<String, List<String>>> {}; // New: Map<Grade, Map<Class, List<Subjects>>>
 
     final structure = {
-    'المرحلة الابتدائية': {
-    'field': 'stage1',
-    'grades': {
-    'الصف الأول': {'field': 'grade1', 'classField': 'class1'},
-    'الصف الثاني': {'field': 'grade2', 'classField': 'class2'},
-    'الصف الثالث': {'field': 'grade3', 'classField': 'class3'},
-    'الصف الرابع': {'field': 'grade4', 'classField': 'class4'},
-    'الصف الخامس': {'field': 'grade5', 'classField': 'class5'},
-    'الصف السادس': {'field': 'grade6', 'classField': 'class6'},
-    }
-    },
-    'المرحلة المتوسطة': {
-    'field': 'stage2',
-    'grades': {
-    'الصف الأول المتوسط': {'field': 'grade11', 'classField': 'class11'},
-    'الصف الثاني المتوسط': {'field': 'grade22', 'classField': 'class22'},
-    'الصف الثالث المتوسط': {'field': 'grade33', 'classField': 'class33'},
-    }
-    },
-    'المرحلة الثانوية': {
-    'field': 'stage3',
-    'grades': {
-    'الصف الأول الثانوي': {'field': 'grade111', 'classField': 'class111'},
-    'الصف الثاني الثانوي': {'field': 'grade222', 'classField': 'class222'},
-    'الصف الثالث الثانوي': {'field': 'grade333', 'classField': 'class333'},
-    }
-    },
+      'المرحلة الابتدائية': {
+        'field': 'stage1',
+        'grades': {
+          'الصف الأول': {'field': 'grade1', 'classField': 'class1'},
+          'الصف الثاني': {'field': 'grade2', 'classField': 'class2'},
+          'الصف الثالث': {'field': 'grade3', 'classField': 'class3'},
+          'الصف الرابع': {'field': 'grade4', 'classField': 'class4'},
+          'الصف الخامس': {'field': 'grade5', 'classField': 'class5'},
+          'الصف السادس': {'field': 'grade6', 'classField': 'class6'},
+        }
+      },
+      'المرحلة المتوسطة': {
+        'field': 'stage2',
+        'grades': {
+          'الصف الأول المتوسط': {'field': 'grade11', 'classField': 'class11'},
+          'الصف الثاني المتوسط': {'field': 'grade22', 'classField': 'class22'},
+          'الصف الثالث المتوسط': {'field': 'grade33', 'classField': 'class33'},
+        }
+      },
+      'المرحلة الثانوية': {
+        'field': 'stage3',
+        'grades': {
+          'الصف الأول الثانوي': {'field': 'grade111', 'classField': 'class111'},
+          'الصف الثاني الثانوي': {'field': 'grade222', 'classField': 'class222'},
+          'الصف الثالث الثانوي': {'field': 'grade333', 'classField': 'class333'},
+        }
+      },
     };
 
     structure.forEach((stageName, stageInfo) {
-    final stageData = stageInfo as Map<String, dynamic>;
-    if (data[stageData['field']] != null && data[stageData['field']] != '0') {
-    stages.add(stageName);
-    grades.putIfAbsent(stageName, () => <String>{});
+      final stageData = stageInfo as Map<String, dynamic>;
+      if (data[stageData['field']] != null && data[stageData['field']] != '0') {
+        stages.add(stageName);
+        grades.putIfAbsent(stageName, () => <String>{});
 
-    final gradesMap = stageData['grades'] as Map<String, dynamic>?;
-    if (gradesMap != null) {
-    gradesMap.forEach((gradeName, gradeInfo) {
-    final gradeData = gradeInfo as Map<String, dynamic>;
-    if (data[gradeData['field']] != null && data[gradeData['field']] != '0') {
-    grades[stageName]!.add(gradeName);
+        final gradesMap = stageData['grades'] as Map<String, dynamic>?;
+        if (gradesMap != null) {
+          gradesMap.forEach((gradeName, gradeInfo) {
+            final gradeData = gradeInfo as Map<String, dynamic>;
+            if (data[gradeData['field']] != null && data[gradeData['field']] != '0') {
+              grades[stageName]!.add(gradeName);
 
-    final classValue = data[gradeData['classField']];
-    if (classValue is String && classValue.isNotEmpty && classValue != '0') {
-    classSubjects.putIfAbsent(gradeName, () => <String, List<String>>{});
+              final classValue = data[gradeData['classField']];
+              if (classValue is String && classValue.isNotEmpty && classValue != '0') {
+                classSubjects.putIfAbsent(gradeName, () => <String, List<String>>{});
 
-    final pairs = classValue.split(',');
-    for (final pair in pairs) {
-    final parts = pair.split('=');
-    if (parts.length == 2) {
-    final className = parts[0].trim();
-    final subjectName = parts[1].trim();
-    if (className.isNotEmpty && subjectName.isNotEmpty) {
-    // This is the key change: it adds the subject to a list for the class.
-    classSubjects[gradeName]!.putIfAbsent(className, () => []).add(subjectName);
-    }
-    }
-    }
-    }
-    }
-    });
-    }
-    }
+                final pairs = classValue.split(',');
+                for (final pair in pairs) {
+                  final parts = pair.split('=');
+                  if (parts.length == 2) {
+                    final className = parts[0].trim();
+                    final subjectName = parts[1].trim();
+                    if (className.isNotEmpty && subjectName.isNotEmpty) {
+                      // This is the key change: it adds the subject to a list for the class.
+                      classSubjects[gradeName]!.putIfAbsent(className, () => []).add(subjectName);
+                    }
+                  }
+                }
+              }
+            }
+          });
+        }
+      }
     });
 
     _availableStages = stages.toList();
@@ -1137,12 +1135,14 @@ class _SchoolAnalyticsPageState extends State<SchoolAnalyticsPage> with SingleTi
     _generateFullSchoolReport();
   }
 
+  // --- [MODIFIED] This is a heavy function. We will provide detailed loading messages.
   Future<void> _generateFullSchoolReport() async {
     try {
       setState(() {
         _isLoading = true;
         _loadingMessage = 'الخطوة 1/4: جاري جلب بيانات جميع الطلاب...';
       });
+      // For very large schools, consider paginating this query or using a Cloud Function.
       final studentsSnapshot = await FirebaseFirestore.instance.collection('students').get();
 
       setState(() => _loadingMessage = 'الخطوة 2/4: جاري جلب بيانات المعلمين...');
@@ -1155,6 +1155,8 @@ class _SchoolAnalyticsPageState extends State<SchoolAnalyticsPage> with SingleTi
 
 
       setState(() => _loadingMessage = 'الخطوة 3/4: جاري معالجة درجات الطلاب...');
+      // This part processes data in memory. It's fast for hundreds of students,
+      // but for thousands, a backend solution (Cloud Function) would be more scalable.
       List<StudentDataPoint> studentDataPoints = [];
       for (final doc in studentsSnapshot.docs) {
         final data = doc.data();

@@ -7,7 +7,7 @@
 
   <title>بوابة مدرسة المعرفة الاهلية</title>
   <meta name="description" content="بوابة إلكترونية متكاملة لطلاب ومعلمي مدرسة المعرفة الأهلية. تابع واجباتك، درجاتك، وتواصل مع المعلمين بكل سهولة.">
-  <link rel="canonical" href="https://elm3refa.site//" />
+  <link rel="canonical" href="https://fantastic-horse-f11dc3.netlify.app//" />
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -18,8 +18,8 @@
 
   <meta property="og:title" content="بوابة مدرسة المعرفة الاهلية" />
   <meta property="og:description" content="البوابة الإلكترونية لطلاب ومعلمي مدرسة المعرفة الأهلية." />
-  <meta property="og:image" content="https://fantastic-horse-f11dc3.netlify.app/icons/Icon-512.png" />
-  <meta property="og:url" content="https://fantastic-horse-f11dc3.netlify.app/" />
+  <meta property="og:image" content="https://your-domain.com/icons/Icon-512.png" />
+  <meta property="og:url" content="https://your-domain.com/" />
   <meta property="og:type" content="website" />
 
   <style>
@@ -35,8 +35,8 @@
     "@context": "https://schema.org",
     "@type": "School",
     "name": "مدرسة المعرفة الأهلية",
-    "url": "https://fantastic-horse-f11dc3.netlify.app/",
-    "logo": "https://fantastic-horse-f11dc3.netlify.app/icons/Icon-512.png",
+    "url": "https://your-domain.com/",
+    "logo": "https://your-domain.com/icons/Icon-512.png",
     "description": "بوابة إلكترونية خاصة بطلاب ومعلمي مدرسة المعرفة الأهلية."
   }
   </script>
@@ -47,43 +47,18 @@
     <p class="loading-text">...جاري تحميل بوابة مدرسة المعرفة الأهلية</p>
   </div>
 
-  <script src="flutter_bootstrap.js" async></script>
-
   <script>
-    let deferredPrompt;
-    window.isInstallable = false;
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      window.isInstallable = true;
-      window.dispatchEvent(new CustomEvent('pwa-installable'));
-    });
-
-    function showInstallPrompt() {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choiceResult) => {
-          if (choiceResult.outcome === 'accepted') {
-            console.log('User accepted the install prompt');
-          } else {
-            console.log('User dismissed the install prompt');
-          }
-          deferredPrompt = null;
-          window.isInstallable = false;
-          window.dispatchEvent(new CustomEvent('pwa-installable'));
-        });
-      }
-    }
+    var serviceWorkerVersion = null;
   </script>
+  <script src="flutter_bootstrap.js" async></script>
 
   <script>
     window.addEventListener('load', function(ev) {
       var loadingIndicator = document.getElementById("loading_indicator");
 
-      _flutter.loader.load({
+      _flutter.loader.loadEntrypoint({
         serviceWorker: {
-          serviceWorkerVersion: {{flutter_service_worker_version}},
+          serviceWorkerVersion: serviceWorkerVersion,
         },
         onEntrypointLoaded: function(engineInitializer) {
           engineInitializer.initializeEngine().then(function(appRunner) {

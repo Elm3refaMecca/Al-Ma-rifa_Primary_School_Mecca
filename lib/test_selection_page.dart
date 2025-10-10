@@ -129,7 +129,7 @@ class TestSelectionPage extends StatelessWidget {
         TestItem(testFieldKey: 'e7profession13', name: 'الاختبار الخامس ف نافس', term: 'اختبارات نافس'),
         TestItem(testFieldKey: 'e8profession13', name: 'الاختبار السادس ف نافس', term: 'اختبارات نافس'),
         TestItem(testFieldKey: 'e9profession13', name: 'الاختبار السابع ف نافس', term: 'اختبارات نافس'),
-        TestItem(testFieldKey: 'e10profession13', name: 'الاختبار الثامن ف نافس', term: 'اختبارات نافс'),
+        TestItem(testFieldKey: 'e10profession13', name: 'الاختبار الثامن ف نافс', term: 'اختبارات نافس'),
         TestItem(testFieldKey: 'e11profession13', name: 'الاختبار التاسع ف نافس', term: 'اختبارات نافس'),
         TestItem(testFieldKey: 'e12profession13', name: 'الاختبار العاشر ف نافس', term: 'اختبارات نافس'),
       ]);

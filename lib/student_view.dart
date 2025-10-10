@@ -15,7 +15,6 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:screenshot/screenshot.dart';
 // --- (إضافة جديدة) المكتبات المطلوبة ---
-import 'package:lottie/lottie.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 enum StudentView { dashboard, results, noble, behaviorNotes }
@@ -262,7 +261,6 @@ class _StudentViewPageState extends State<StudentViewPage>
                 child: SizedBox(
                   width: 120,
                   height: 120,
-                  child: Lottie.asset('assets/whatsapp-button.json'),
                 ),
               ),
             ),

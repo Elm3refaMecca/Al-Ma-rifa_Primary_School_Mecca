@@ -69,14 +69,11 @@ dev_dependencies:
   printing: ^5.11.1
   pdf: ^3.10.8
   screenshot: ^3.0.0
-  lottie: ^3.1.2
+  simple_speed_dial: ^0.1.7
 
 
 
-
-
-
-# For information on the generic Dart part of this file, see the
+# For infrmation on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
