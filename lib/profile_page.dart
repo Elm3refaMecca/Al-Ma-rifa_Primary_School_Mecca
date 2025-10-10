@@ -1,10 +1,12 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
+
+// --- MODIFIED: Deferred imports for image picking/uploading ---
+import 'dart:io' deferred as io;
+import 'package:firebase_storage/firebase_storage.dart' deferred as storage;
+import 'package:image_picker/image_picker.dart' deferred as image_picker;
+
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -46,31 +48,32 @@ class _ProfilePageState extends State<ProfilePage> {
 
   /// Picks an image from the gallery and uploads it to Firebase Storage.
   /// The storage path is 'photosT/{userId}.jpg' to match security rules.
+  // --- MODIFIED: with Deferred Loading ---
   Future<void> _pickAndUploadImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
+    // Load necessary libraries on demand
+    await Future.wait([
+      io.loadLibrary(),
+      storage.loadLibrary(),
+      image_picker.loadLibrary(),
+    ]);
+
+    final picker = image_picker.ImagePicker();
+    final pickedFile = await picker.pickImage(source: image_picker.ImageSource.gallery, imageQuality: 50);
 
     if (pickedFile == null) return;
 
     setState(() => _isUploading = true);
 
     try {
-      final file = File(pickedFile.path);
+      final file = io.File(pickedFile.path);
 
-      final ref = FirebaseStorage.instance.ref('photosT/${_user!.uid}.jpg');
+      final ref = storage.FirebaseStorage.instance.ref('photosT/${_user!.uid}.jpg');
 
       await ref.putFile(file);
       final url = await ref.getDownloadURL();
 
-      // --- ( تعديل ) ---
-      // Add a unique query parameter (timestamp) to the URL.
-      // This is a common technique to "bust" the image cache, forcing Flutter
-      // to re-download the image because it sees a new, unique URL.
       final uniqueUrl = '$url?v=${DateTime.now().millisecondsSinceEpoch}';
 
-      // This now uses .set() with merge:true. It's safer because it will
-      // CREATE the document if it doesn't exist, or just update the 'photo' field
-      // if it does. This prevents errors and ensures the photo is always saved.
       await FirebaseFirestore.instance.collection('users').doc(_user!.uid).set(
         {'photo': uniqueUrl}, // Save the new unique URL
         SetOptions(merge: true),
@@ -79,9 +82,8 @@ class _ProfilePageState extends State<ProfilePage> {
       if(mounted) {
         // Update the UI with the new photo instantly.
         setState(()   {
-          // If _userData was null, initialize it before setting the photo.
           _userData ??= {};
-          _userData!['photo'] = uniqueUrl; // Update state with the unique URL
+          _userData!['photo'] = uniqueUrl;
         });
       }
 
@@ -183,4 +185,3 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 }
-
