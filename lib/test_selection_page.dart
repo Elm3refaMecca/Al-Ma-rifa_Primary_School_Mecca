@@ -129,7 +129,7 @@ class TestSelectionPage extends StatelessWidget {
         TestItem(testFieldKey: 'e7profession13', name: 'الاختبار الخامس ف نافس', term: 'اختبارات نافس'),
         TestItem(testFieldKey: 'e8profession13', name: 'الاختبار السادس ف نافس', term: 'اختبارات نافس'),
         TestItem(testFieldKey: 'e9profession13', name: 'الاختبار السابع ف نافس', term: 'اختبارات نافس'),
-        TestItem(testFieldKey: 'e10profession13', name: 'الاختبار الثامن ف نافس', term: 'اختبارات نافس'),
+        TestItem(testFieldKey: 'e10profession13', name: 'الاختبار الثامن ف نافس', term: 'اختبارات نافс'),
         TestItem(testFieldKey: 'e11profession13', name: 'الاختبار التاسع ف نافس', term: 'اختبارات نافس'),
         TestItem(testFieldKey: 'e12profession13', name: 'الاختبار العاشر ف نافس', term: 'اختبارات نافس'),
       ]);
@@ -142,16 +142,18 @@ class TestSelectionPage extends StatelessWidget {
   Widget build(BuildContext context) {
     // --- MODIFIED: Use the loader widget for deferred loading ---
     if (isBehaviorMode) {
+      // For behavior mode, navigate directly to a loader which will then show the page.
       return _GradeEntryLoader(
         stage: stage,
         grade: grade,
         className: className,
         subject: subject,
-        testFieldKey: 'behavior_mode',
+        testFieldKey: 'behavior_mode', // A special key for behavior mode
         testName: 'تقييم سلوك الطلاب',
         isBehaviorMode: true,
       );
     }
+
 
     final allTests = _getTestsForSubject();
     final term1Tests = allTests.where((t) => t.term == 'الترم الأول').toList();
@@ -199,21 +201,17 @@ class TestSelectionPage extends StatelessWidget {
           return _TestTile(
             test: test,
             isAdmin: isAdmin,
-            // --- MODIFIED: onTap is now async to handle deferred loading ---
-            onTap: (isLocked) async {
+            // --- MODIFIED: onTap now uses the loader widget for navigation ---
+            onTap: (isLocked) {
               if (isLocked && !isAdmin) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('هذا الاختبار مغلق حالياً من قبل الإدارة.')),
                 );
               } else {
-                // Load the library before navigating
-                await grade_entry.loadLibrary();
-                if (!context.mounted) return;
-
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => grade_entry.GradeEntryPage(
+                    builder: (context) => _GradeEntryLoader( // Use the loader
                       stage: stage,
                       grade: grade,
                       className: className,
