@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "mostfa-said"
-  }
+    "default": "mostfa-said",
+    "e": "mostfa-said"
+  },
+  "targets": {},
+  "etags": {}
 }

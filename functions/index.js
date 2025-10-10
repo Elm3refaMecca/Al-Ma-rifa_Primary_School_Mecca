@@ -1,61 +1,59 @@
-const functions = require("firebase-functions");
-const admin = require("firebase-admin");
+// استيراد الدوال الحديثة من الإصدار الجديد
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { initializeApp } = require("firebase-admin/app");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 
-admin.initializeApp();
-
-const db = admin.firestore();
+// تهيئة Firebase Admin SDK
+initializeApp();
+const db = getFirestore();
 
 /**
- * Triggers when a new behavior report is created, and sends a notification
- * to the corresponding student.
+ * 🔔 Trigger: عند إنشاء تقرير سلوكي جديد في مجموعة behavior_reports
+ * يقوم هذا الكود بإرسال إشعار إلى الطالب المرتبط بهذا التقرير.
  */
-exports.sendBehaviorNotification = functions.firestore
-    .document("behavior_reports/{reportId}")
-    .onCreate(async (snap, context) => {
-      const reportData = snap.data();
-      if (!reportData) {
-        console.log("No data associated with the event");
-        return;
-      }
+exports.sendBehaviorNotification = onDocumentCreated(
+  "behavior_reports/{reportId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) {
+      console.log("❌ لا توجد بيانات في الحدث.");
+      return;
+    }
 
-      const {studentId, teacherName, type, teacherId} = reportData;
+    const reportData = snap.data();
+    const { studentId, teacherName, type, teacherId } = reportData;
 
-      if (!studentId || !teacherName || !type) {
-        console.log("Missing required data (studentId, teacherName, type).");
-        return;
-      }
+    if (!studentId || !teacherName || !type) {
+      console.log("⚠️ البيانات المطلوبة ناقصة (studentId, teacherName, type).");
+      return;
+    }
 
-      let message = "";
-      if (type === "like") {
-        message = `لديك إشادة سلوكية (نبل) من المعلم ${teacherName}.`;
-      } else {
-        message = `لديك ملاحظة سلوكية (شغب) من المعلم ${teacherName}.`;
-      }
+    // نص الإشعار حسب نوع السلوك
+    let message = "";
+    if (type === "like") {
+      message = `لديك إشادة سلوكية (نبل) من المعلم ${teacherName}.`;
+    } else {
+      message = `لديك ملاحظة سلوكية (شغب) من المعلم ${teacherName}.`;
+    }
 
-      const notificationPayload = {
-        message: message,
-        teacherId: teacherId,
-        reportId: context.params.reportId,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        isRead: false,
-      };
+    const notificationPayload = {
+      message: message,
+      teacherId: teacherId || null,
+      reportId: event.params.reportId,
+      timestamp: FieldValue.serverTimestamp(),
+      isRead: false,
+    };
 
-      try {
-        await db
-            .collection("students")
-            .doc(studentId)
-            .collection("notifications")
-            .add(notificationPayload);
+    try {
+      await db
+        .collection("students")
+        .doc(studentId)
+        .collection("notifications")
+        .add(notificationPayload);
 
-        console.log(
-            "Successfully sent notification to student:",
-            studentId,
-        );
-      } catch (error) {
-        console.error(
-            "Error sending notification to student:",
-            studentId,
-            error,
-        );
-      }
-    });
+      console.log("✅ تم إرسال الإشعار للطالب:", studentId);
+    } catch (error) {
+      console.error("❌ خطأ أثناء إرسال الإشعار:", studentId, error);
+    }
+  }
+);

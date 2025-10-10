@@ -68,7 +68,6 @@ class _AddPageState extends State<AddPage> {
     }
   }
 
-  // --- [MODIFIED] The function now takes BuildContext ---
   Future<void> _launchWhatsApp() async {
     const phoneNumber = '966569064173'; // رقم الهاتف بدون + أو 00
     final Uri whatsappUri = Uri.parse('https://wa.me/$phoneNumber');
@@ -276,7 +275,6 @@ class _AddPageState extends State<AddPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // --- [MODIFIED] Changed logo to assets/2.png for consistency ---
         leading: Padding(
           padding: const EdgeInsets.all(8.0),
           child: Image.asset('assets/2.png'),
@@ -468,11 +466,15 @@ class _GradeEntrySelectionPageState extends State<GradeEntrySelectionPage> {
   String? _selectedStage, _selectedGrade, _selectedClass;
   bool _isLoading = true;
 
-  List<String> _teacherSubjects = [];
+  // --- [MODIFIED] This data structure now holds a list of subjects for each class.
+  // Map<GradeName, Map<ClassName, List<SubjectName>>>
+  Map<String, Map<String, List<String>>> _classSubjectMapByGrade = {};
+
+  // --- [NEW] This list will hold the specific subjects available for the chosen class.
+  List<String> _subjectsForSelectedClass = [];
+
   List<String> _availableStages = [];
   Map<String, List<String>> _gradesByStage = {};
-  Map<String, List<String>> _classesByGrade = {};
-
   List<String> _gradesForSelectedStage = [];
   List<String> _classesForSelectedGrade = [];
 
@@ -525,7 +527,6 @@ class _GradeEntrySelectionPageState extends State<GradeEntrySelectionPage> {
 
       _userData = data;
       if (widget.isAdmin) {
-        _teacherSubjects = _allSubjects;
         _availableStages = _allStages;
       } else {
         _parseTeacherPermissions(data);
@@ -538,84 +539,89 @@ class _GradeEntrySelectionPageState extends State<GradeEntrySelectionPage> {
     }
   }
 
+  // --- [MODIFIED] This function now handles multiple subjects for the same class.
   void _parseTeacherPermissions(Map<String, dynamic> data) {
-    _teacherSubjects = [
-      data['profession1'], data['profession2'], data['profession3'],
-      data['profession4'], data['profession5'], data['profession6'],
-      data['profession7'], data['profession8'], data['profession9'],
-      data['profession10'], data['profession11'], data['profession12'],
-      data['profession13'], data['profession14'],
-    ].where((s) => s != null && s.isNotEmpty).cast<String>().toList();
-
     final stages = <String>{};
     final grades = <String, Set<String>>{};
-    final classes = <String, Set<String>>{};
+    final classSubjects = <String, Map<String, List<String>>> {}; // New: Map<Grade, Map<Class, List<Subjects>>>
 
     final structure = {
-      'المرحلة الابتدائية': {
-        'field': 'stage1',
-        'grades': {
-          'الصف الأول': {'field': 'grade1', 'classField': 'class1'},
-          'الصف الثاني': {'field': 'grade2', 'classField': 'class2'},
-          'الصف الثالث': {'field': 'grade3', 'classField': 'class3'},
-          'الصف الرابع': {'field': 'grade4', 'classField': 'class4'},
-          'الصف الخامس': {'field': 'grade5', 'classField': 'class5'},
-          'الصف السادس': {'field': 'grade6', 'classField': 'class6'},
-        }
-      },
-      'المرحلة المتوسطة': {
-        'field': 'stage2',
-        'grades': {
-          'الصف الأول المتوسط': {'field': 'grade11', 'classField': 'class11'},
-          'الصف الثاني المتوسط': {'field': 'grade22', 'classField': 'class22'},
-          'الصف الثالث المتوسط': {'field': 'grade33', 'classField': 'class33'},
-        }
-      },
-      'المرحلة الثانوية': {
-        'field': 'stage3',
-        'grades': {
-          'الصف الأول الثانوي': {'field': 'grade111', 'classField': 'class111'},
-          'الصف الثاني الثانوي': {'field': 'grade222', 'classField': 'class222'},
-          'الصف الثالث الثانوي': {'field': 'grade333', 'classField': 'class333'},
-        }
-      },
+    'المرحلة الابتدائية': {
+    'field': 'stage1',
+    'grades': {
+    'الصف الأول': {'field': 'grade1', 'classField': 'class1'},
+    'الصف الثاني': {'field': 'grade2', 'classField': 'class2'},
+    'الصف الثالث': {'field': 'grade3', 'classField': 'class3'},
+    'الصف الرابع': {'field': 'grade4', 'classField': 'class4'},
+    'الصف الخامس': {'field': 'grade5', 'classField': 'class5'},
+    'الصف السادس': {'field': 'grade6', 'classField': 'class6'},
+    }
+    },
+    'المرحلة المتوسطة': {
+    'field': 'stage2',
+    'grades': {
+    'الصف الأول المتوسط': {'field': 'grade11', 'classField': 'class11'},
+    'الصف الثاني المتوسط': {'field': 'grade22', 'classField': 'class22'},
+    'الصف الثالث المتوسط': {'field': 'grade33', 'classField': 'class33'},
+    }
+    },
+    'المرحلة الثانوية': {
+    'field': 'stage3',
+    'grades': {
+    'الصف الأول الثانوي': {'field': 'grade111', 'classField': 'class111'},
+    'الصف الثاني الثانوي': {'field': 'grade222', 'classField': 'class222'},
+    'الصف الثالث الثانوي': {'field': 'grade333', 'classField': 'class333'},
+    }
+    },
     };
 
     structure.forEach((stageName, stageInfo) {
-      final stageData = stageInfo as Map<String, dynamic>;
-      if (data[stageData['field']] != null && data[stageData['field']] != '0') {
-        stages.add(stageName);
-        grades.putIfAbsent(stageName, () => <String>{});
+    final stageData = stageInfo as Map<String, dynamic>;
+    if (data[stageData['field']] != null && data[stageData['field']] != '0') {
+    stages.add(stageName);
+    grades.putIfAbsent(stageName, () => <String>{});
 
-        final gradesMap = stageData['grades'] as Map<String, dynamic>?;
-        if (gradesMap != null) {
-          gradesMap.forEach((gradeName, gradeInfo) {
-            final gradeData = gradeInfo as Map<String, dynamic>;
-            if (data[gradeData['field']] != null && data[gradeData['field']] != '0') {
-              grades[stageName]!.add(gradeName);
+    final gradesMap = stageData['grades'] as Map<String, dynamic>?;
+    if (gradesMap != null) {
+    gradesMap.forEach((gradeName, gradeInfo) {
+    final gradeData = gradeInfo as Map<String, dynamic>;
+    if (data[gradeData['field']] != null && data[gradeData['field']] != '0') {
+    grades[stageName]!.add(gradeName);
 
-              final classValue = data[gradeData['classField']];
-              if (classValue is String && classValue.isNotEmpty && classValue != '0') {
-                classes.putIfAbsent(gradeName, () => <String>{});
-                classes[gradeName]!.addAll(classValue.split(',').map((e) => e.trim()));
-              }
-            }
-          });
-        }
-      }
+    final classValue = data[gradeData['classField']];
+    if (classValue is String && classValue.isNotEmpty && classValue != '0') {
+    classSubjects.putIfAbsent(gradeName, () => <String, List<String>>{});
+
+    final pairs = classValue.split(',');
+    for (final pair in pairs) {
+    final parts = pair.split('=');
+    if (parts.length == 2) {
+    final className = parts[0].trim();
+    final subjectName = parts[1].trim();
+    if (className.isNotEmpty && subjectName.isNotEmpty) {
+    // This is the key change: it adds the subject to a list for the class.
+    classSubjects[gradeName]!.putIfAbsent(className, () => []).add(subjectName);
+    }
+    }
+    }
+    }
+    }
+    });
+    }
+    }
     });
 
     _availableStages = stages.toList();
     _gradesByStage = grades.map((key, value) => MapEntry(key, value.toList()));
-    _classesByGrade = classes.map((key, value) => MapEntry(key, value.toList()));
+    _classSubjectMapByGrade = classSubjects;
   }
 
+  // --- [MODIFIED] The build method is updated for the new user flow.
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.isBehaviorMode ? 'اختيار فصل لتقييم السلوك' : 'اختيار فصل ومادة للرصد'),
-        // --- [ADDED] School logo in AppBar ---
         actions: [
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -632,9 +638,11 @@ class _GradeEntrySelectionPageState extends State<GradeEntrySelectionPage> {
           const SizedBox(height: 12),
           _buildDropdown(_availableStages, _selectedStage, 'اختر المرحلة', (val) => setState(() {
             _selectedStage = val;
-            _selectedGrade = null; _selectedClass = null;
+            _selectedGrade = null;
+            _selectedClass = null;
             _gradesForSelectedStage = val != null ? (widget.isAdmin ? _allGrades : (_gradesByStage[val] ?? [])) : [];
             _classesForSelectedGrade = [];
+            _subjectsForSelectedClass = [];
           })),
           const SizedBox(height: 24),
 
@@ -644,7 +652,12 @@ class _GradeEntrySelectionPageState extends State<GradeEntrySelectionPage> {
             _buildDropdown(_gradesForSelectedStage, _selectedGrade, 'اختر الصف', (val) => setState(() {
               _selectedGrade = val;
               _selectedClass = null;
-              _classesForSelectedGrade = val != null ? (widget.isAdmin ? _allClasses : (_classesByGrade[val] ?? [])) : [];
+              _classesForSelectedGrade = val != null
+                  ? (widget.isAdmin
+                  ? _allClasses
+                  : (_classSubjectMapByGrade[val]?.keys.toList() ?? []))
+                  : [];
+              _subjectsForSelectedClass = [];
             })),
             const SizedBox(height: 24),
           ],
@@ -654,6 +667,12 @@ class _GradeEntrySelectionPageState extends State<GradeEntrySelectionPage> {
             const SizedBox(height: 12),
             _buildDropdown(_classesForSelectedGrade, _selectedClass, 'اختر الفصل', (val) => setState(() {
               _selectedClass = val;
+              if (val != null && _selectedGrade != null && !widget.isAdmin) {
+                // Get the list of subjects for the chosen class
+                _subjectsForSelectedClass = _classSubjectMapByGrade[_selectedGrade!]?[val] ?? [];
+              } else {
+                _subjectsForSelectedClass = [];
+              }
             })),
             const SizedBox(height: 24),
           ],
@@ -662,12 +681,10 @@ class _GradeEntrySelectionPageState extends State<GradeEntrySelectionPage> {
             const Divider(thickness: 1, height: 30),
             _buildSectionTitle('4. اختر المادة', Icons.book),
             const SizedBox(height: 16),
-            _teacherSubjects.isEmpty
-                ? const Center(child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text('لم يتم تحديد مواد لك في ملفك الشخصي.'),
-            ))
-                : _buildSubjectGrid(),
+            _buildSubjectGrid(
+              // For admins, show all subjects. For teachers, show only the subjects for the selected class.
+              widget.isAdmin ? _allSubjects : _subjectsForSelectedClass,
+            ),
           ],
         ],
       ),
@@ -698,7 +715,15 @@ class _GradeEntrySelectionPageState extends State<GradeEntrySelectionPage> {
     );
   }
 
-  Widget _buildSubjectGrid() {
+  // --- [MODIFIED] This function now accepts a list of subjects to display.
+  Widget _buildSubjectGrid(List<String> subjects) {
+    if (subjects.isEmpty && !widget.isAdmin) {
+      return const Center(child: Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Text('لا توجد مواد مسندة لك في هذا الفصل.'),
+      ));
+    }
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -708,9 +733,9 @@ class _GradeEntrySelectionPageState extends State<GradeEntrySelectionPage> {
         mainAxisSpacing: 16,
         childAspectRatio: 2.5,
       ),
-      itemCount: _teacherSubjects.length,
+      itemCount: subjects.length,
       itemBuilder: (context, index) {
-        final subject = _teacherSubjects[index];
+        final subject = subjects[index];
         return ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
@@ -985,7 +1010,8 @@ class TeacherInfo {
     final assignedClasses = permissions[gradeInfo['classField']] as String?;
     if (assignedClasses == null || assignedClasses == '0') return false;
 
-    return assignedClasses.split(',').map((e) => e.trim()).contains(className);
+    // Modified to check for class name within the new "ClassName=SubjectName" format
+    return assignedClasses.split(',').any((pair) => pair.split('=').first.trim() == className);
   }
 }
 
