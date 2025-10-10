@@ -72,15 +72,18 @@
       _flutter.loader.loadEntrypoint({
         onEntrypointLoaded: function(engineInitializer) {
           engineInitializer.initializeEngine().then(function(appRunner) {
-            appRunner.runApp().then(function(app) {
-              // إخفاء شاشة التحميل برسوم متحركة عند تشغيل التطبيق
-              if(loadingIndicator) {
-                loadingIndicator.style.opacity = '0';
-                setTimeout(function() {
-                  loadingIndicator.style.display = 'none';
-                }, 500);
-              }
-            });
+            // -- بداية التغيير --
+            // إخفاء شاشة التحميل قبل تشغيل التطبيق مباشرة
+            if(loadingIndicator) {
+              loadingIndicator.style.opacity = '0';
+              setTimeout(function() {
+                loadingIndicator.style.display = 'none';
+              }, 500); // الانتظار حتى انتهاء تأثير التلاشي
+            }
+
+            // الآن قم بتشغيل التطبيق
+            appRunner.runApp();
+            // -- نهاية التغيير --
           });
         }
       });
