@@ -1,0 +1,8 @@
+[build]
+  # هذا يخبر Netlify بأمر البناء والفرع للنشر
+  command = "flutter build web --web-renderer html --release"
+  publish = "build/web"
+
+# هذا يطلب من Netlify تثبيت ملحق Flutter قبل البناء
+[[plugins]]
+  package = "netlify-plugin-flutter"
