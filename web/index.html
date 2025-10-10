@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <base href="/">
 
   <title>بوابة مدرسة المعرفة الاهلية</title>
-  <meta name="description" content="بوابة إلكترونية متكاملة لطلاب ومعلمي مدرسة المعرفة الأهلية. تابع واجباتك، درجاتك، وتواصل مع المعلمين بكل سهولة.">
-  <link rel="canonical" href="https://elm3refa.site//" />
+  <meta name="description" content="بوابة إلكترونية متكاملة لطلاب ومعلمي مدرسة المعرفة الأهلية.">
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -16,30 +16,46 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
   <link rel="manifest" href="manifest.json">
 
-  <meta property="og:title" content="بوابة مدرسة المعرفة الاهلية" />
-  <meta property="og:description" content="البوابة الإلكترونية لطلاب ومعلمي مدرسة المعرفة الأهلية." />
-  <meta property="og:image" content="https://fantastic-horse-f11dc3.netlify.app/icons/Icon-512.png" />
-  <meta property="og:url" content="https://fantastic-horse-f11dc3.netlify.app/" />
-  <meta property="og:type" content="website" />
-
   <style>
-    body { background-color: #f5f5f5; overflow: hidden; }
-    .loading-container { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; position: fixed; top: 0; left: 0; width: 100%; z-index: 9999; background-color: #f5f5f5; transition: opacity 0.5s ease; }
-    .loading-spinner { border: 6px solid #e0e0e0; border-top: 6px solid #1976D2; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
-    .loading-text { margin-top: 20px; font-family: 'Cairo', sans-serif; font-size: 16px; color: #333; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    body {
+      background-color: #f5f5f5;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        width: 100vw;
+        position: fixed;
+        top: 0;
+        left: 0;
+        background-color: #f5f5f5;
+        transition: opacity 0.5s ease; /* For a smooth fade-out */
+    }
+    .loading-spinner {
+        border: 6px solid #e0e0e0; /* Light grey */
+        border-top: 6px solid #1976D2; /* Primary blue color */
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+    }
+    .loading-text {
+        margin-top: 20px;
+        /* Using a common font for better compatibility */
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 16px;
+        color: #333;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
   </style>
-  
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "School",
-    "name": "مدرسة المعرفة الأهلية",
-    "url": "https://fantastic-horse-f11dc3.netlify.app/",
-    "logo": "https://fantastic-horse-f11dc3.netlify.app/icons/Icon-512.png",
-    "description": "بوابة إلكترونية خاصة بطلاب ومعلمي مدرسة المعرفة الأهلية."
-  }
-  </script>
 </head>
 <body>
   <div id="loading_indicator" class="loading-container">
@@ -50,49 +66,28 @@
   <script src="flutter_bootstrap.js" async></script>
 
   <script>
-    let deferredPrompt;
-    window.isInstallable = false;
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      window.isInstallable = true;
-      window.dispatchEvent(new CustomEvent('pwa-installable'));
-    });
-
-    function showInstallPrompt() {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choiceResult) => {
-          if (choiceResult.outcome === 'accepted') {
-            console.log('User accepted the install prompt');
-          } else {
-            console.log('User dismissed the install prompt');
-          }
-          deferredPrompt = null;
-          window.isInstallable = false;
-          window.dispatchEvent(new CustomEvent('pwa-installable'));
-        });
-      }
-    }
-  </script>
-
-  <script>
     window.addEventListener('load', function(ev) {
+      // Get the loading indicator element
       var loadingIndicator = document.getElementById("loading_indicator");
 
+      // Load the Flutter app
       _flutter.loader.load({
         serviceWorker: {
+          // This version string will be automatically updated by the build process
           serviceWorkerVersion: {{flutter_service_worker_version}},
         },
         onEntrypointLoaded: function(engineInitializer) {
+          // Initialize the Flutter engine
           engineInitializer.initializeEngine().then(function(appRunner) {
+            // Once the engine is ready, hide the loading indicator
             if (loadingIndicator) {
               loadingIndicator.style.opacity = '0';
+              // Remove the indicator from the DOM after the fade-out transition
               setTimeout(function() {
                 loadingIndicator.style.display = 'none';
-              }, 500);
+              }, 500); // This duration must match the CSS transition duration
             }
+            // Run the Flutter app
             appRunner.runApp();
           });
         }
