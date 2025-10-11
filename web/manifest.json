@@ -1,11 +1,11 @@
 {
-    "name": "بوابة مدرسة المعرفة الاهلية",
-    "short_name": "بوابة المعرفة",
+    "name": "almarefamecca",
+    "short_name": "almarefamecca",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#1976D2",
-    "theme_color": "#1976D2",
-    "description": "بوابة إلكترونية خاصة بطلاب ومعلمي مدرسة المعرفة الأهلية.",
+    "background_color": "#0175C2",
+    "theme_color": "#0175C2",
+    "description": "A new Flutter project.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
