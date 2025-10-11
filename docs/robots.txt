@@ -1,0 +1,19 @@
+# Allow all search engines full access to render the site
+User-agent: *
+Allow: /
+
+# Specifically allow assets required for rendering
+Allow: /*.js$
+Allow: /*.css$
+Allow: /*.png$
+Allow: /*.jpg$
+Allow: /*.svg$
+Allow: /icons/
+Allow: /assets/
+
+# Disallow paths that are not useful for search results
+Disallow: /api/
+Disallow: /admin/
+
+# Location of the sitemap (مهم جداً: قم بتغيير الرابط)
+Sitemap: https://your-domain.com/sitemap.xml
